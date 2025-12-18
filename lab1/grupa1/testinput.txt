@@ -1,0 +1,21 @@
+main
+    // Deklaracija promenljivih razlicitih tipova
+    int brojac;
+    float vrednost;
+    bool status;
+
+    // Testiranje konstanti definisanih u zadatku
+    brojac := 0x1A;      // Hex (26)
+    brojac := 012;       // Octal (10)
+    brojac := 100;       // Decimal
+    
+    // Float mora poceti sa 0. prema tekstu zadatka
+    vrednost := 0.123;
+    vrednost := 0.55E-2;
+
+    status := true;
+
+    // Apply izraz
+    for i in [ list1, list2 ] apply brojac + 5;
+    
+exit

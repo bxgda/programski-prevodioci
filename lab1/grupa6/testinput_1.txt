@@ -1,0 +1,23 @@
+program
+begin
+** test svih mogucnosti **
+x, y : integer;
+flag : boolean;
+c : char;
+r : real;
+
+x := 10;
+y := 0xFF;
+r := .25E+2;
+c := 'a';
+flag := true;
+
+while x < y :
+    begin
+        x := x;
+    end
+else
+    begin
+        y := y;
+    end
+end.

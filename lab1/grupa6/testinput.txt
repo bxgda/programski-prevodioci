@@ -1,0 +1,8 @@
+program
+begin
+** ovo je komentar **
+a : integer;
+b : char;
+a := 356;
+b := 'c';
+end.
