@@ -1,0 +1,19 @@
+main() {
+    
+    int a, b;
+    char c;
+    bool flag;
+    float x;
+
+    a = 123;
+    b = 0#x1F;
+    c = 'z';
+    flag = true;
+    x = 0.25E-2;
+
+    loop (a > 0) {
+        a = a;
+        redo (a == 10);
+        b = b;
+    }
+}
