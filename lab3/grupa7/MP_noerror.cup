@@ -1,0 +1,85 @@
+/* MP_noerror_v10k.cup
+ * CUP v0.10k - verzija BEZ oporavka od sintaksnih gresaka
+ */
+
+import java_cup.runtime.*;
+import java.io.*;
+
+parser code {:
+  /* Bez oporavka: prekini na prvoj sintaksnoj gresci */
+  public void report_error(String message, Object info) {
+    if (info instanceof Symbol) {
+      Symbol s = (Symbol) info;
+      throw new RuntimeException("SINTAKSNA GRESKA: " + message +
+        " (linija " + s.left + ", kolona " + s.right + ")");
+    }
+    throw new RuntimeException("SINTAKSNA GRESKA: " + message);
+  }
+
+  public void report_fatal_error(String message, Object info) throws Exception {
+    report_error(message, info);
+  }
+:};
+
+/* terminali - kljucne reci */
+terminal MAIN, INT, CHAR, FLOAT, BOOL, LOOP, REDO;
+
+/* terminali - identifikator i konstanta */
+terminal ID, CONST;
+
+/* zagrade i separatori */
+terminal LPAREN, RPAREN, LBRACE, RBRACE;
+terminal SEMICOLON, COMMA;
+
+/* operatori */
+terminal ASSIGN, OR, AND;
+terminal LT, GT, LE, GE, EQ, NE;
+
+/* neterminali */
+non terminal RedoLoop, Statement, Expression, ExpressionTail;
+non terminal AndExpression, AndExpressionTail, Term;
+
+precedence left OR;
+precedence left AND;
+
+/* start */
+start with RedoLoop;
+
+/* ======== gramatika ======== */
+
+RedoLoop ::=
+    LOOP LPAREN Expression RPAREN
+    LBRACE
+      Statement
+      REDO LPAREN Expression RPAREN SEMICOLON
+      Statement
+    RBRACE
+;
+
+Statement ::=
+    RedoLoop
+  | ID ASSIGN Expression SEMICOLON
+;
+
+Expression ::=
+    AndExpression ExpressionTail
+;
+
+ExpressionTail ::=
+    OR AndExpression ExpressionTail
+  | /* empty */
+;
+
+AndExpression ::=
+    Term AndExpressionTail
+;
+
+AndExpressionTail ::=
+    AND Term AndExpressionTail
+  | /* empty */
+;
+
+Term ::=
+    ID
+  | CONST
+;

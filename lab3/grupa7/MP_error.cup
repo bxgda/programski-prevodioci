@@ -1,0 +1,115 @@
+import java_cup.runtime.*;
+import java.io.*;
+
+parser code {:
+  public void report_error(String message, Object info) {
+    if (info instanceof Symbol) {
+      Symbol s = (Symbol) info;
+      System.err.println("SINTAKSNA GRESKA: " + message +
+        " (linija " + s.left + ", kolona " + s.right + ")");
+      return;
+    }
+    System.err.println("SINTAKSNA GRESKA: " + message);
+  }
+
+  public void report_fatal_error(String message, Object info) throws Exception {
+    report_error(message, info);
+    throw new RuntimeException(message);
+  }
+:};
+
+/* terminali - kljucne reci */
+terminal MAIN, INT, CHAR, FLOAT, BOOL, LOOP, REDO;
+
+/* terminali - identifikator i konstanta */
+terminal ID, CONST;
+
+/* zagrade i separatori */
+terminal LPAREN, RPAREN, LBRACE, RBRACE;
+terminal SEMICOLON, COMMA;
+
+/* operatori */
+terminal ASSIGN, OR, AND;
+terminal LT, GT, LE, GE, EQ, NE;
+
+/* neterminali */
+non terminal RedoLoop, Statement, Expression, ExpressionTail;
+non terminal AndExpression, AndExpressionTail, Term;
+
+precedence left OR;
+precedence left AND;
+
+/* start */
+start with RedoLoop;
+
+/* ======== gramatika + oporavak ======== */
+
+RedoLoop ::=
+    LOOP LPAREN Expression RPAREN
+    LBRACE
+      Statement
+      REDO LPAREN Expression RPAREN SEMICOLON
+      Statement
+    RBRACE
+
+  /* Oporavak 1: los uslov u LOOP(...) -> preskoci do ')' */
+  | LOOP LPAREN error RPAREN
+    LBRACE
+      Statement
+      REDO LPAREN Expression RPAREN SEMICOLON
+      Statement
+    RBRACE
+    {: parser.report_error("Neispravan uslov u LOOP(...), preskacem do ')'", null); :}
+
+  /* Oporavak 2: los uslov u REDO(...) -> preskoci do ')' */
+  | LOOP LPAREN Expression RPAREN
+    LBRACE
+      Statement
+      REDO LPAREN error RPAREN SEMICOLON
+      Statement
+    RBRACE
+    {: parser.report_error("Neispravan uslov u REDO(...), preskacem do ')'", null); :}
+
+  /* Oporavak 3: greska u telu bloka -> preskoci do '}' */
+  | LOOP LPAREN Expression RPAREN
+    LBRACE
+      error
+    RBRACE
+    {: parser.report_error("Greska u LOOP bloku, preskacem do '}'", null); :}
+;
+
+Statement ::=
+    RedoLoop
+  | ID ASSIGN Expression SEMICOLON
+
+  /* Oporavak 4: los izraz u dodeli -> preskoci do ';' */
+  | ID ASSIGN error SEMICOLON
+    {: parser.report_error("Neispravan izraz u dodeli, preskacem do ';'", null); :}
+
+  /* Oporavak 5: neprepoznata naredba -> preskoci do ';' */
+  | error SEMICOLON
+    {: parser.report_error("Neispravna naredba, preskacem do ';'", null); :}
+;
+
+Expression ::=
+    AndExpression ExpressionTail
+;
+
+ExpressionTail ::=
+    OR AndExpression ExpressionTail
+  | /* empty */
+;
+
+AndExpression ::=
+    Term AndExpressionTail
+;
+
+AndExpressionTail ::=
+    AND Term AndExpressionTail
+  | /* empty */
+;
+
+Term ::=
+    ID
+  | CONST
+;

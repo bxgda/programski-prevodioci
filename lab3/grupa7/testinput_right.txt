@@ -1,0 +1,5 @@
+loop ( x && y ) {
+  a = b && c;
+  redo ( x );
+  d = a && b;
+}
