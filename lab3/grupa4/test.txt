@@ -1,0 +1,8 @@
+program Test
+{
+  int x     
+  x = 5;
+  float y   
+  y = 2.0;
+}
+end

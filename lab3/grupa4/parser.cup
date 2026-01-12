@@ -1,0 +1,45 @@
+import java_cup.runtime.*;
+
+parser code {:
+    public void report_error(String message, Object info) {
+        System.out.print(message);
+    }
+    
+    public void syntax_error(Symbol cur_token) {
+        report_error("Sintaksna greska u liniji " + (cur_token.left + 1) + ": ", cur_token);
+        System.out.println("Token '" + cur_token.value + "' nije ocekivan.");
+    }
+:};
+
+// Terminali (izvuceni iz tvog sym.java)
+terminal PROGRAM, END, INT, FLOAT, CHAR;
+terminal ASSIGN, ARROW, COLON, SEMICOLON, COMMA, LPAREN, RPAREN, LBRACE, RBRACE;
+terminal String ID, CONST;
+
+// Neterminali
+non terminal Program, Block, Declarations, Declaration, Type, StatementList, Statement;
+non terminal Assignment, Mapping;
+
+start with Program;
+
+Program ::= PROGRAM ID Block END ;
+
+Block ::= LBRACE Declarations StatementList RBRACE ;
+
+Declarations ::= Declarations Declaration 
+               | /* empty */ ;
+
+Declaration ::= Type ID SEMICOLON ;
+
+Type ::= INT | FLOAT | CHAR ;
+
+StatementList ::= StatementList Statement
+                | /* empty */ ;
+
+Statement ::= Assignment 
+            | Mapping
+            | Block ;
+
+Assignment ::= ID ASSIGN CONST SEMICOLON ;
+
+Mapping ::= ID ARROW ID COLON CONST SEMICOLON ;
