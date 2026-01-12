@@ -1,0 +1,15 @@
+main
+    int x;
+    y;          // nema tip
+    float z;
+
+    x := 5;
+    y = 10;     // = umesto :=
+    z := 0.1;
+
+    // lose napisana lista prazna je zagrada
+    for i in [ , ] apply x := 1;
+
+    x := x + ;  // nedovrsen izraz
+
+// nedostaje exit

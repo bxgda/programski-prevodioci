@@ -1,0 +1,11 @@
+main
+    int brojac;
+    float procenat;
+    bool status;
+    int privremena;
+    brojac := 10;
+    procenat := 0.123;
+    privremena := brojac + 5;
+    for i in [brojac, privremena] apply status := true;
+    privremena := 1
+exit

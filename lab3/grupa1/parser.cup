@@ -1,0 +1,49 @@
+import java_cup.runtime.*;
+
+parser code {:
+    public void syntax_error(Symbol cur_token) {
+        System.err.println("Sintaksna greska: Neocekivan token '" + cur_token.value + 
+            "' na liniji " + (cur_token.left + 1));
+    }
+:};
+
+terminal MAIN, EXIT, INT, FLOAT, BOOL, FOR, IN, APPLY;
+terminal PLUS, MINUS, ASSIGN, SEMICOLON, COMMA, LBRACKET, RBRACKET;
+terminal String ID, CONST;
+
+non terminal Program, Block, Declarations, Declaration, Type;
+non terminal Expressions, Expression, Assignment, ArithmeticExpression;
+non terminal TermExpression, ApplyExpression, NameList;
+
+start with Program;
+
+Program ::= MAIN Block EXIT ;
+
+Block ::= Declarations Expressions ;
+
+Declarations ::= Declarations Declaration
+               | Declaration ;
+
+Declaration ::= Type ID SEMICOLON ;
+
+Type ::= INT | FLOAT | BOOL ;
+
+Expressions ::= Expressions SEMICOLON Expression
+              | Expression ;
+
+Expression ::= Assignment
+             | ApplyExpression ;
+
+Assignment ::= ID ASSIGN ArithmeticExpression ;
+
+ArithmeticExpression ::= ArithmeticExpression PLUS TermExpression
+                      | ArithmeticExpression MINUS TermExpression
+                      | TermExpression ;
+
+TermExpression ::= CONST
+                | ID ;
+
+ApplyExpression ::= FOR ID IN LBRACKET NameList RBRACKET APPLY Expression ;
+
+NameList ::= NameList COMMA ID
+           | ID ;
