@@ -1,0 +1,63 @@
+import java_cup.runtime.*;
+import java.io.*;
+
+parser code {:
+    public static void main(String args[]) throws Exception {
+        new parser(new MPLexer(new FileReader(args[0]))).parse();
+    }
+
+    public void syntax_error(Symbol cur_token) {
+        System.err.println("Sintaksna greska: Linija " + (cur_token.left + 1) + ", Kolona " + (cur_token.right + 1));
+    }
+:};
+
+terminal MAIN, LEFTPAR, RIGHTPAR, BLOCK_BEGIN, BLOCK_END, SEMICOLON, COLON, ASSIGN;
+terminal INT, REAL, BOOLEAN, IF, ELSE, ELIF;
+terminal LESS, LESSEQ, EQ, NEQ, GREATER, GREATEREQ;
+terminal String ID, CONST;
+
+non terminal Program, Block, Variables, Variable, Type, Statements, Statement;
+non terminal IfStatement, ElsePart, ElifList, Elif, ElseStatement;
+non terminal RelExpression, Term, RelOp, Assignment;
+
+start with Program;
+
+Program ::= MAIN LEFTPAR RIGHTPAR Block ;
+
+Block ::= BLOCK_BEGIN Variables Statements BLOCK_END ;
+
+Variables ::= Variables Variable 
+            | Variable ;
+
+Variable ::= Type ID SEMICOLON ;
+
+Type ::= INT | REAL | BOOLEAN ;
+
+Statements ::= Statements SEMICOLON Statement 
+             | Statement ;
+
+Statement ::= Assignment 
+            | IfStatement ;
+
+IfStatement ::= IF LEFTPAR RelExpression RIGHTPAR COLON Block ElsePart ;
+
+ElsePart ::= ElifList ElseStatement 
+           | ElifList 
+           | ElseStatement 
+           | /* epsilon */ ;
+
+ElifList ::= ElifList Elif 
+           | Elif ;
+
+Elif ::= ELIF LEFTPAR RelExpression RIGHTPAR COLON Block ;
+
+ElseStatement ::= ELSE COLON Block ;
+
+RelExpression ::= Term RelOp Term 
+                | Term ;
+
+Term ::= ID | CONST ;
+
+RelOp ::= LESS | LESSEQ | EQ | NEQ | GREATER | GREATEREQ ;
+
+Assignment ::= ID ASSIGN Term ;

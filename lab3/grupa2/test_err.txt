@@ -1,0 +1,26 @@
+main () 
+{
+    int a;
+    real b          /** GRESKA: Nedostaje ; nakon deklaracije b */
+    boolean c;
+
+    a := 5;
+    b := 10.5;
+
+    /** Leksicka greska: simboli @ i $ nisu definisani u specifikaciji */
+    a := @ + $; 
+
+    /** Sintaksna greska: nedostaje : kod if naredbe */
+    if (a > 0) 
+    {
+        a := 1;
+    }
+    
+    /** Sintaksna greska: pogresan operator dodele (treba := a ne =) */
+    c = false;
+
+    else : 
+    {
+        a := 0;
+    }
+}

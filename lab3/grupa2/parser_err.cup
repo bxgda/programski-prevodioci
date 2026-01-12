@@ -1,0 +1,73 @@
+import java_cup.runtime.*;
+import java.io.*;
+
+parser code {:
+    public void syntax_error(Symbol cur_token) {
+        System.err.println("Sintaksna greska: Linija " + (cur_token.left + 1) + ", Kolona " + (cur_token.right + 1));
+    }
+:};
+
+terminal MAIN, LEFTPAR, RIGHTPAR, BLOCK_BEGIN, BLOCK_END, SEMICOLON, COLON, ASSIGN;
+terminal INT, REAL, BOOLEAN, IF, ELSE, ELIF;
+terminal LESS, LESSEQ, EQ, NEQ, GREATER, GREATEREQ;
+terminal String ID, CONST;
+
+non terminal Program, Block, Variables, Variable, Type, Statements, Statement;
+non terminal IfStatement, ElsePart, ElifList, Elif, ElseStatement;
+non terminal RelExpression, Term, RelOp, Assignment;
+
+start with Program;
+
+Program ::= MAIN LEFTPAR RIGHTPAR Block 
+          | MAIN error Block {: System.out.println("Oporavak: Greska u zaglavlju main funkcije."); :}
+          ;
+
+Block ::= BLOCK_BEGIN Variables Statements BLOCK_END ;
+
+Variables ::= Variables Variable 
+            | Variable ;
+
+// Oporavak u varijablama: Vezujemo gresku za Type, da bi se razlikovalo od Statement-a
+Variable ::= Type ID SEMICOLON 
+           | Type error SEMICOLON {: System.out.println("Oporavak: Los ID u deklaraciji promenljive."); :}
+           | error ID SEMICOLON   {: System.out.println("Oporavak: Los tip u deklaraciji promenljive."); :}
+           ;
+
+Type ::= INT | REAL | BOOLEAN ;
+
+Statements ::= Statements SEMICOLON Statement 
+             | Statement ;
+
+Statement ::= Assignment 
+            | IfStatement 
+            ;
+
+// Oporavak u IF-u: Hvata greske unutar zagrada (uslova)
+IfStatement ::= IF LEFTPAR RelExpression RIGHTPAR COLON Block ElsePart
+              | IF error COLON Block ElsePart {: System.out.println("Oporavak: Greska u uslovu IF naredbe."); :}
+              ;
+
+ElsePart ::= ElifList ElseStatement 
+           | ElifList 
+           | ElseStatement 
+           | /* epsilon */ ;
+
+ElifList ::= ElifList Elif 
+           | Elif ;
+
+Elif ::= ELIF LEFTPAR RelExpression RIGHTPAR COLON Block ;
+
+ElseStatement ::= ELSE COLON Block ;
+
+RelExpression ::= Term RelOp Term 
+                | Term ;
+
+Term ::= ID | CONST ;
+
+RelOp ::= LESS | LESSEQ | EQ | NEQ | GREATER | GREATEREQ ;
+
+// Oporavak u dodeli: ID := <greska>. 
+// Izbacili smo opste "error" pravilo koje je pravilo Shift/Reduce konflikt.
+Assignment ::= ID ASSIGN Term 
+             | ID ASSIGN error {: System.out.println("Oporavak: Los izraz u dodeli vrednosti."); :}
+             ;

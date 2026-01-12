@@ -1,0 +1,29 @@
+main () 
+{
+    int x;
+    real y;
+    boolean pronadjeno;
+
+    x := 10;
+    y := 12.5;
+    pronadjeno := true;
+
+    if (x < 20) : 
+    {
+        int unutar;
+        unutar := x;
+        x := unutar
+    }
+    elif (x == 30) :
+    {
+        real nula;
+        nula := 0.0;
+        y := nula
+    }
+    else :
+    {
+        boolean kraj;
+        kraj := false;
+        pronadjeno := kraj
+    }
+}
