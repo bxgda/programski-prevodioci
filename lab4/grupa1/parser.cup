@@ -1,0 +1,208 @@
+import java_cup.runtime.*;
+import java.util.HashMap;
+import java.util.Map;
+
+action code {:
+    enum VarType {
+        INT,
+        FLOAT,
+        BOOL,
+        ERROR
+    }
+
+    static class SymbolInfo {
+        final VarType type;
+        boolean initialized;
+
+        SymbolInfo(VarType type, boolean initialized) {
+            this.type = type;
+            this.initialized = initialized;
+        }
+    }
+
+    static class ExprInfo {
+        final VarType type;
+
+        ExprInfo(VarType type) {
+            this.type = type;
+        }
+    }
+
+    static class NameListInfo {
+        final VarType type;
+
+        NameListInfo(VarType type) {
+            this.type = type;
+        }
+    }
+
+    private final Map<String, SymbolInfo> symTable = new HashMap<>();
+
+    private void semError(String msg, int line) {
+        System.err.println("Semanticka greska: " + msg + " na liniji " + (line + 1));
+    }
+
+    private boolean isNumeric(VarType t) {
+        return t == VarType.INT || t == VarType.FLOAT;
+    }
+
+    private VarType higherNumeric(VarType a, VarType b) {
+        if (a == VarType.ERROR || b == VarType.ERROR) return VarType.ERROR;
+        if (a == VarType.FLOAT || b == VarType.FLOAT) return VarType.FLOAT;
+        return VarType.INT;
+    }
+
+    private VarType typeFromConst(String c) {
+        if (c == null) return VarType.ERROR;
+        if ("true".equals(c) || "false".equals(c)) return VarType.BOOL;
+        if (c.contains(".") || c.contains("E") || c.contains("e")) return VarType.FLOAT;
+        return VarType.INT;
+    }
+
+    private SymbolInfo requireDeclared(String name, int line) {
+        SymbolInfo info = symTable.get(name);
+        if (info == null) {
+            semError("Promenljiva '" + name + "' nije deklarisana", line);
+        }
+        return info;
+    }
+:};
+
+parser code {:
+    public void syntax_error(Symbol cur_token) {
+        System.err.println("Sintaksna greska: Neocekivan token '" + cur_token.value + 
+            "' na liniji " + (cur_token.left + 1));
+    }
+:};
+
+terminal MAIN, EXIT, INT, FLOAT, BOOL, FOR, IN, APPLY;
+terminal PLUS, MINUS, ASSIGN, SEMICOLON, COMMA, LBRACKET, RBRACKET;
+terminal String ID, CONST;
+
+non terminal Program, Block, Declarations, Declaration;
+non terminal VarType Type;
+non terminal Expressions;
+non terminal ExprInfo Expression, Assignment, ArithmeticExpression, TermExpression, ApplyExpression;
+non terminal NameListInfo NameList;
+
+start with Program;
+
+Program ::= MAIN Block EXIT ;
+
+Block ::= Declarations Expressions ;
+
+Declarations ::= Declarations Declaration
+               | Declaration ;
+
+Declaration ::= Type:t ID:i SEMICOLON
+             {:
+                if (symTable.containsKey(i)) {
+                    semError("Promenljiva '" + i + "' je vec deklarisana", ileft);
+                } else {
+                    symTable.put(i, new SymbolInfo(t, false));
+                }
+             :};
+
+Type ::= INT {: RESULT = VarType.INT; :}
+    | FLOAT {: RESULT = VarType.FLOAT; :}
+    | BOOL {: RESULT = VarType.BOOL; :}
+    ;
+
+Expressions ::= Expressions SEMICOLON Expression
+              | Expression ;
+
+Expression ::= Assignment:a {: RESULT = a; :}
+             | ApplyExpression:a {: RESULT = a; :}
+             ;
+
+Assignment ::= ID:i ASSIGN ArithmeticExpression:ae
+             {:
+                SymbolInfo info = requireDeclared(i, ileft);
+                if (info != null) {
+                    if (info.type == VarType.BOOL) {
+                        semError("Nekompatibilna dodela promenljivoj tipa bool", ileft);
+                    } else if (!isNumeric(ae.type)) {
+                        semError("Nekompatibilna dodela nenumericke vrednosti", ileft);
+                    } else if (info.type == VarType.INT && ae.type == VarType.FLOAT) {
+                        semError("Nedozvoljena konverzija iz float u int", ileft);
+                    } else {
+                        info.initialized = true;
+                    }
+                }
+                RESULT = new ExprInfo(info == null ? VarType.ERROR : info.type);
+             :};
+
+ArithmeticExpression ::= ArithmeticExpression:a PLUS TermExpression:b
+                                            {:
+                                                if (!isNumeric(a.type) || !isNumeric(b.type)) {
+                                                        semError("Aritmeticki operatori zahtevaju numericke operande", aleft);
+                                                        RESULT = new ExprInfo(VarType.ERROR);
+                                                } else {
+                                                        RESULT = new ExprInfo(higherNumeric(a.type, b.type));
+                                                }
+                                            :}
+                                            | ArithmeticExpression:a MINUS TermExpression:b
+                                            {:
+                                                if (!isNumeric(a.type) || !isNumeric(b.type)) {
+                                                        semError("Aritmeticki operatori zahtevaju numericke operande", aleft);
+                                                        RESULT = new ExprInfo(VarType.ERROR);
+                                                } else {
+                                                        RESULT = new ExprInfo(higherNumeric(a.type, b.type));
+                                                }
+                                            :}
+                                            | TermExpression:t {: RESULT = t; :}
+                                            ;
+
+TermExpression ::= CONST:c
+                {:
+                    VarType t = typeFromConst(c);
+                    RESULT = new ExprInfo(t);
+                :}
+                | ID:i
+                {:
+                    SymbolInfo info = requireDeclared(i, ileft);
+                    if (info != null && !info.initialized) {
+                        semError("Promenljiva '" + i + "' nije inicijalizovana", ileft);
+                    }
+                    RESULT = new ExprInfo(info == null ? VarType.ERROR : info.type);
+                :}
+                ;
+
+ApplyExpression ::= FOR ID:i IN LBRACKET NameList:nl RBRACKET APPLY Expression:e
+                 {:
+                    SymbolInfo info = requireDeclared(i, ileft);
+                    if (info != null && nl != null && nl.type != VarType.ERROR) {
+                        if (info.type != nl.type) {
+                            semError("ID u apply naredbi mora biti istog tipa kao elementi NameList", ileft);
+                        }
+                    }
+                    RESULT = new ExprInfo(e == null ? VarType.ERROR : e.type);
+                 :}
+                 ;
+
+NameList ::= NameList:nl COMMA ID:i
+           {:
+                SymbolInfo info = requireDeclared(i, ileft);
+                if (info != null && !info.initialized) {
+                    semError("Promenljiva '" + i + "' nije inicijalizovana", ileft);
+                }
+
+                VarType nextType = info == null ? VarType.ERROR : info.type;
+                if (nl == null || nl.type == VarType.ERROR || nextType == VarType.ERROR) {
+                    RESULT = new NameListInfo(VarType.ERROR);
+                } else if (nl.type != nextType) {
+                    semError("NameList u apply naredbi mora imati promenljive istog tipa", ileft);
+                    RESULT = new NameListInfo(VarType.ERROR);
+                } else {
+                    RESULT = new NameListInfo(nl.type);
+                }
+           :}
+           | ID:i
+           {:
+                SymbolInfo info = requireDeclared(i, ileft);
+                if (info != null && !info.initialized) {
+                    semError("Promenljiva '" + i + "' nije inicijalizovana", ileft);
+                }
+                RESULT = new NameListInfo(info == null ? VarType.ERROR : info.type);
+           :}
+           ;

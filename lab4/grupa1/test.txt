@@ -1,0 +1,16 @@
+main
+    int x;
+    float y;
+    bool flag;
+
+    int x;                 // redeklaracija
+    y := 2;                // ok
+    x := y;                // nedozvoljena konverzija float -> int
+    z := 1;                // nedeklarisana promenljiva
+    flag := true;          // nedozvoljena dodela bool (po pravilima broj. tipova)
+    y := w + 1;            // koriscenje nedeklarisane promenljive w
+    x := x + 1;            // koriscenje neinicijalizovane promenljive x
+
+    for x in [y, y] apply y := y + 1;   // ID u apply nije istog tipa kao NameList (int vs float)
+    for y in [x, y] apply y := y + 1   // NameList razlicitih tipova + x neinicijalizovan
+exit
