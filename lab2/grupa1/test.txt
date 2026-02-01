@@ -1,0 +1,1 @@
+for x in [a, b, c] apply a + 0x1A + c
