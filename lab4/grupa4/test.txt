@@ -1,0 +1,15 @@
+program Test
+{
+  int x;
+  float y;
+  char c;
+  int foo(x: int, y: float = 2.5);
+  int bar();
+
+  x = 5;
+  y = 2.0;
+  c = 'a';
+  foo(x, y);
+  bar();
+}
+end

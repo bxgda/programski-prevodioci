@@ -1,0 +1,247 @@
+import java_cup.runtime.*;
+import java.util.*;
+parser code {:
+    private final Deque<Map<String, SymInfo>> scopes = new ArrayDeque<>();
+    private int semanticErrors = 0;
+
+    void openScope() { scopes.push(new HashMap<>()); }
+    void closeScope() { scopes.pop(); }
+
+    void sem_error(String msg, int line) {
+        semanticErrors++;
+        System.out.println("Semanticka greska u liniji " + (line + 1) + ": " + msg);
+    }
+
+    SymInfo lookupSym(String name) {
+        for (Map<String, SymInfo> s : scopes) {
+            SymInfo v = s.get(name);
+            if (v != null) return v;
+        }
+        return null;
+    }
+
+    VarInfo lookupVar(String name) {
+        SymInfo s = lookupSym(name);
+        return (s != null && s.kind == SymKind.VAR) ? s.var : null;
+    }
+
+    FuncInfo lookupFunc(String name) {
+        SymInfo s = lookupSym(name);
+        return (s != null && s.kind == SymKind.FUNC) ? s.func : null;
+    }
+
+    void declareVar(String name, MyType t, int line) {
+        Map<String, SymInfo> cur = scopes.peek();
+        if (cur.containsKey(name)) {
+            sem_error("Ime '" + name + "' je vec deklarisano u ovom opsegu.", line);
+            return;
+        }
+        cur.put(name, SymInfo.var(new VarInfo(t, false)));
+    }
+
+    void declareFunc(String name, MyType ret, List<ParamInfo> params, int line) {
+        Map<String, SymInfo> cur = scopes.peek();
+        if (cur.containsKey(name)) {
+            sem_error("Ime '" + name + "' je vec deklarisano u ovom opsegu.", line);
+            return;
+        }
+        int min = 0;
+        for (ParamInfo p : params) if (!p.hasDefault) min++;
+        cur.put(name, SymInfo.func(new FuncInfo(ret, params, min)));
+    }
+
+    boolean canImplicitlyConvert(MyType from, MyType to) {
+        if (from == null || to == null) return false;
+        if (from == to) return true;
+        if (from == MyType.CHAR && (to == MyType.INT || to == MyType.FLOAT)) return true;
+        return from == MyType.INT && to == MyType.FLOAT;
+    }
+
+    MyType constType(String lexeme) {
+        if (lexeme == null) return null;
+        lexeme = lexeme.trim();
+        if (lexeme.matches("'([^'\\\\]|\\\\.)'")) return MyType.CHAR;
+        if (lexeme.matches("([0-9]+\\.[0-9]*|\\.[0-9]+)([eE][+-]?[0-9]+)?")) return MyType.FLOAT;
+        if (lexeme.matches("0x[0-9a-fA-F]+")) return MyType.INT;
+        if (lexeme.matches("0[0-7]+")) return MyType.INT;
+        if (lexeme.matches("0|[1-9][0-9]*")) return MyType.INT;
+        return null;
+    }
+
+    public void report_error(String message, Object info) { System.out.print(message); }
+    public void syntax_error(Symbol cur_token) {
+        report_error("Sintaksna greska u liniji " + (cur_token.left + 1) + ": ", cur_token);
+        System.out.println("Token '" + cur_token.value + "' nije ocekivan.");
+    }
+:};
+terminal PROGRAM, END, INT, FLOAT, CHAR;
+terminal ASSIGN, ARROW, COLON, SEMICOLON, COMMA, LPAREN, RPAREN, LBRACE, RBRACE;
+terminal String ID, CONST;
+
+non terminal Program, Block, Declarations, Declaration, StatementList, Statement;
+non terminal Assignment, Mapping, FunctionDecl, FunctionCall;
+non terminal MyType T, Arg;
+non terminal java.util.List ParamList, ParamListOpt, ArgList, ArgListOpt;
+non terminal ParamInfo Param;
+
+start with Program;
+Program ::= PROGRAM ID {: parser.openScope(); :} Block END {: parser.closeScope(); :};
+Block ::= LBRACE {: parser.openScope(); :} Declarations StatementList RBRACE {: parser.closeScope(); :};
+Declarations ::= Declarations Declaration | /* empty */;
+
+Declaration ::= T:t ID:i SEMICOLON
+              {:
+                parser.declareVar((String)i, (MyType)t, ileft);
+              :}
+              | FunctionDecl
+              ;
+
+T ::= INT   {: RESULT = MyType.INT;   :}
+   | FLOAT {: RESULT = MyType.FLOAT; :}
+   | CHAR  {: RESULT = MyType.CHAR;  :}
+   ;
+
+StatementList ::= StatementList Statement | /* empty */;
+
+Statement ::= Assignment | Mapping | FunctionCall | Block;
+Assignment ::= ID:i ASSIGN CONST:c SEMICOLON
+            {:
+                String id = (String)i;
+                String cval = (String)c;
+                VarInfo v = parser.lookupVar(id);
+                if (v == null) {
+                    parser.sem_error("Promenljiva '" + id + "' nije deklarisana.", ileft);
+                } else {
+                    MyType ct = parser.constType(cval);
+                    if (ct == null) {
+                        parser.sem_error("Nepoznat tip konstante '" + cval + "'.", cleft);
+                    } else if (!parser.canImplicitlyConvert(ct, v.type)) {
+                        parser.sem_error("Ne moze dodela tipa " + ct + " u '" + id + "' tipa " + v.type + ".", ileft);
+                    } else {
+                        v.initialized = true;
+                    }
+                }
+            :}
+            ;
+
+Mapping ::= ID:l ARROW ID:r COLON CONST:c SEMICOLON
+         {:
+            String leftId = (String)l;
+            String rightId = (String)r;
+            String cval = (String)c;
+
+            VarInfo L = parser.lookupVar(leftId);
+            if (L == null) parser.sem_error("ID '" + leftId + "' nije deklarisan.", lleft);
+
+            VarInfo R = parser.lookupVar(rightId);
+            if (R == null) parser.sem_error("ID '" + rightId + "' nije deklarisan.", rleft);
+
+            if (R != null && !R.initialized)
+                parser.sem_error("Promenljiva '" + rightId + "' nije inicijalizovana.", rleft);
+
+            MyType ct = parser.constType(cval);
+            if (ct == null) {
+                parser.sem_error("Nepoznat tip konstante '" + cval + "'.", cleft);
+            } else if (L != null && !parser.canImplicitlyConvert(ct, L.type)) {
+                parser.sem_error("Konstanta tipa " + ct + " nije kompatibilna sa '" + leftId + "' tipa " + L.type + ".", lleft);
+            } else if (L != null) {
+                L.initialized = true;
+            }
+         :}
+         ;
+
+FunctionDecl ::= T:rt ID:i LPAREN ParamListOpt:params RPAREN SEMICOLON
+              {:
+                MyType rtype = (MyType)rt;
+                String name = (String)i;
+                List paramsList = (List)params;
+                HashSet<String> seen = new HashSet<>();
+                for (Object o : paramsList) {
+                    ParamInfo p = (ParamInfo)o;
+                    if (seen.contains(p.name))
+                        parser.sem_error("Parametar '" + p.name + "' je vec deklarisan u ovoj funkciji.", ileft);
+                    else
+                        seen.add(p.name);
+                }
+                parser.declareFunc(name, rtype, paramsList, ileft);
+              :}
+              ;
+
+ParamListOpt ::= ParamList:l {: RESULT = l; :}
+               | /* empty */ {: RESULT = new ArrayList(); :}
+               ;
+
+ParamList ::= ParamList:l COMMA Param:p {: l.add(p); RESULT = l; :}
+           | Param:p                {: List l = new ArrayList(); l.add(p); RESULT = l; :}
+           ;
+
+Param ::= ID:i COLON T:t
+       {:
+          RESULT = new ParamInfo((String)i, (MyType)t, false);
+       :}
+       | ID:i COLON T:t ASSIGN CONST:c
+       {:
+          String cval = (String)c;
+          MyType ptype = (MyType)t;
+          MyType ct = parser.constType(cval);
+          if (ct == null)
+              parser.sem_error("Nepoznat tip konstante '" + cval + "'.", cleft);
+          else if (ct != ptype)
+              parser.sem_error("Podrazumevana vrednost parametra '" + (String)i + "' nije tipa " + ptype + ".", ileft);
+          RESULT = new ParamInfo((String)i, ptype, true);
+       :}
+       ;
+
+FunctionCall ::= ID:i LPAREN ArgListOpt:args RPAREN SEMICOLON
+              {:
+                String name = (String)i;
+                List argsList = (List)args;
+                FuncInfo f = parser.lookupFunc(name);
+                if (f == null) {
+                    parser.sem_error("Funkcija '" + name + "' nije deklarisana.", ileft);
+                } else {
+                    int argCount = argsList.size();
+                    if (argCount < f.minArgs || argCount > f.params.size()) {
+                        parser.sem_error("Pogresan broj argumenata za funkciju '" + name + "'.", ileft);
+                    } else {
+                        for (int idx = 0; idx < argCount; idx++) {
+                            MyType at = (MyType)argsList.get(idx);
+                            MyType pt = f.params.get(idx).type;
+                            if (at != null && !parser.canImplicitlyConvert(at, pt))
+                                parser.sem_error("Argument #" + (idx + 1) + " nije kompatibilan sa tipom " + pt + ".", ileft);
+                        }
+                    }
+                }
+              :}
+              ;
+
+ArgListOpt ::= ArgList:l {: RESULT = l; :}
+            | /* empty */ {: RESULT = new ArrayList(); :}
+            ;
+
+ArgList ::= ArgList:l COMMA Arg:a {: l.add(a); RESULT = l; :}
+         | Arg:a                {: List l = new ArrayList(); l.add(a); RESULT = l; :}
+         ;
+
+Arg ::= ID:i
+     {:
+        String name = (String)i;
+        VarInfo v = parser.lookupVar(name);
+        if (v == null) {
+            parser.sem_error("Promenljiva '" + name + "' nije deklarisana.", ileft);
+            RESULT = null;
+        } else {
+            if (!v.initialized)
+                parser.sem_error("Promenljiva '" + name + "' nije inicijalizovana.", ileft);
+            RESULT = v.type;
+        }
+     :}
+   | CONST:c
+     {:
+        String cval = (String)c;
+        MyType ct = parser.constType(cval);
+        if (ct == null)
+            parser.sem_error("Nepoznat tip konstante '" + cval + "'.", cleft);
+        RESULT = ct;
+     :}
+   ;
