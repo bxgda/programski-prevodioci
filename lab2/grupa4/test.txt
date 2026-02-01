@@ -1,0 +1,21 @@
+
+-- Ovo je pocetak bloka 
+   komentara koji se zavrsava --
+{
+    varInt : int;
+    varFloat : float;
+    
+    -- Testiranje dodela i brojeva --
+    varInt = 123;
+    varInt = 0x1A;
+    varInt = 012;
+    
+    varFloat = 123.456;
+    varFloat = .55;
+    varFloat = 12.E+2;
+    varFloat = .5E-3;
+
+    -- Testiranje funkcije i char-a --
+    myFunc( p1 : int = 'c' ) => varInt;
+}
+end

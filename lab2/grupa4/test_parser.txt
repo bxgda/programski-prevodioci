@@ -1,0 +1,1 @@
+funkcija ( a = 0x1A , b = 5.5 , c  => a * b * 100 ;
